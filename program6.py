@@ -1,52 +1,70 @@
-import pandas as pd
+import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.datasets import fetch_california_housing
 
-# Load dataset
-df = fetch_california_housing(as_frame=True).frame
+# Generate data
+def generate_data():
+    np.random.seed(42)
+    X = np.linspace(0, 10, 100)
+    y = np.sin(X) + np.random.normal(0, 0.2, 100)
 
-print(df.head())
+    return X.reshape(-1, 1), y
 
-# Plot histograms
-def plot_histograms(df):
-    df.hist(figsize=(12, 10), bins=30)
-    plt.suptitle("Histograms")
+# LWR for one query point
+def lwr(X, y, x_query, tau):
+
+    # Compute weights using Gaussian kernel
+    weights = np.exp(-(X - x_query)**2 / (2 * tau**2)).flatten()
+
+    # Create diagonal weight matrix
+    W = np.diag(weights)
+
+    # Add bias term
+    X_b = np.hstack([np.ones_like(X), X])
+
+    # Compute theta using weighted normal equation
+    theta = np.linalg.inv(X_b.T @ W @ X_b) @ X_b.T @ W @ y
+
+    # Predict output for query point
+    x_query_b = np.array([1, x_query])
+
+    return x_query_b @ theta
+
+# Predict for all points
+def predict(X, y, tau):
+
+    y_pred = []
+
+    for x in X:
+        y_pred.append(lwr(X, y, x[0], tau))
+
+    return np.array(y_pred)
+
+# Plot graph
+def plot_graph(X, y, y_pred, tau):
+
+    plt.figure(figsize=(10, 6))
+
+    plt.scatter(X, y, color='blue',
+                label='Data Points')
+
+    plt.plot(X, y_pred, color='red',
+             linewidth=2,
+             label=f'LWR (tau={tau})')
+
+    plt.title('Locally Weighted Regression')
+    plt.xlabel('X')
+    plt.ylabel('Y')
+
+    plt.legend()
+    plt.grid(True)
+
     plt.show()
 
-# Plot box plots
-def plot_boxplots(df):
-    print("Hiii BoxPlottt")
-    plt.figure(figsize=(12, 10))
+# Main
+X, y = generate_data()
 
-    for i, col in enumerate(df.columns, 1):
-        plt.subplot(3, 3, i)
-        sns.boxplot(y=df[col])
-        plt.title(col)
+tau = 0.5
 
-    plt.tight_layout()
-    plt.show()
+y_pred = predict(X, y, tau)
 
-# Analyze features and detect outliers
-def analyze_features(df):
-    for col in df.columns:
-        print("\nFeature:", col)
-        print("Mean   :", round(df[col].mean(), 2))
-        print("Median :", round(df[col].median(), 2))
-        print("Std Dev:", round(df[col].std(), 2))
-
-        Q1 = df[col].quantile(0.25)
-        Q3 = df[col].quantile(0.75)
-        IQR = Q3 - Q1
-
-        lower = Q1 - 1.5 * IQR
-        upper = Q3 + 1.5 * IQR
-
-        outliers = df[(df[col] < lower) | (df[col] > upper)]
-
-        print("Outliers:", len(outliers))
-
-# Function calls
-plot_histograms(df)
-plot_boxplots(df)
-analyze_features(df)
+plot_graph(X, y, y_pred, tau)
